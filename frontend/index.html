@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL批量过滤工具</title>
+    <style>
+        /* ===== Design Tokens ===== */
+        :root {
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            --font-mono: "SF Mono", "Fira Code", "Consolas", monospace;
+
+            --color-bg: #f5f4f0;
+            --color-surface: #ffffff;
+            --color-border: #e2e0db;
+            --color-text: #1a1a1a;
+            --color-text-secondary: #6e6b66;
+            --color-muted: #9e9b95;
+            --color-accent: #c4501c;
+            --color-accent-hover: #a33d14;
+            --color-success: #2d7d46;
+            --color-warning: #b8860b;
+            --color-danger: #c41e3a;
+
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 16px;
+            --space-lg: 24px;
+            --space-xl: 32px;
+            --space-2xl: 48px;
+
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+
+            --sidebar-width: 300px;
+            --header-height: 80px;
+        }
+
+        /* ===== Reset ===== */
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            font-family: var(--font-sans);
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--color-text);
+            background: var(--color-bg);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ===== Layout ===== */
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            height: var(--header-height);
+            padding: var(--space-md) var(--space-lg);
+            background: var(--color-surface);
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: var(--space-sm);
+            flex-shrink: 0;
+        }
+
+        .header-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-title {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--color-text);
+        }
+
+        .header-status {
+            font-size: 13px;
+            color: var(--color-text-secondary);
+            font-weight: 500;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: var(--space-sm);
+        }
+
+        .main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--color-surface);
+            border-right: 1px solid var(--color-border);
+            overflow-y: auto;
+            padding: var(--space-lg);
+            flex-shrink: 0;
+        }
+
+        .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .workspace {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .footer {
+            height: 36px;
+            padding: 0 var(--space-lg);
+            background: var(--color-surface);
+            border-top: 1px solid var(--color-border);
+            display: flex;
+            align-items: center;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            flex-shrink: 0;
+        }
+
+        /* ===== Sidebar Sections ===== */
+        .section {
+            margin-bottom: var(--space-lg);
+        }
+
+        .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--color-muted);
+            margin-bottom: var(--space-md);
+            padding-bottom: var(--space-sm);
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .section-item {
+            margin-bottom: var(--space-sm);
+        }
+
+        .section-item:last-child {
+            margin-bottom: 0;
+        }
+
+        /* ===== Form Controls ===== */
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--color-text);
+            padding: var(--space-xs) 0;
+            transition: color 0.15s;
+        }
+
+        .checkbox-label:hover {
+            color: var(--color-accent);
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--color-accent);
+            cursor: pointer;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+            margin-top: var(--space-sm);
+        }
+
+        .input-group label {
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            min-width: 60px;
+            flex-shrink: 0;
+        }
+
+        .input-field {
+            flex: 1;
+            padding: var(--space-xs) var(--space-sm);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-family: var(--font-sans);
+            background: var(--color-surface);
+            color: var(--color-text);
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .input-field:focus {
+            border-color: var(--color-accent);
+        }
+
+        .input-field:disabled {
+            background: var(--color-bg);
+            color: var(--color-muted);
+            cursor: not-allowed;
+        }
+
+        /* ===== Buttons ===== */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-sm) var(--space-md);
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: var(--font-sans);
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--color-accent);
+            color: white;
+            border-color: var(--color-accent);
+        }
+
+        .btn-primary:hover {
+            background: var(--color-accent-hover);
+        }
+
+        .btn-secondary {
+            background: var(--color-surface);
+            color: var(--color-text);
+            border-color: var(--color-border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--color-bg);
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--color-text-secondary);
+            border-color: transparent;
+        }
+
+        .btn-ghost:hover {
+            color: var(--color-text);
+            background: var(--color-bg);
+        }
+
+        .btn-sm {
+            padding: var(--space-xs) var(--space-sm);
+            font-size: 12px;
+        }
+
+        /* ===== Panels ===== */
+        .panel {
+            background: var(--color-surface);
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel:last-child {
+            border-bottom: none;
+        }
+
+        .panel-header {
+            padding: var(--space-sm) var(--space-md);
+            border-bottom: 1px solid var(--color-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .panel-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .panel-body {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .panel-body textarea {
+            width: 100%;
+            height: 100%;
+            padding: var(--space-md);
+            border: none;
+            resize: none;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            line-height: 1.7;
+            color: var(--color-text);
+            background: transparent;
+            outline: none;
+        }
+
+        .panel-body textarea::placeholder {
+            color: var(--color-muted);
+        }
+
+        /* ===== Split Panes ===== */
+        .split-horizontal {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .split-horizontal > .panel {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .split-horizontal > .panel:first-child {
+            border-right: 1px solid var(--color-border);
+        }
+
+        /* ===== Stats Bar ===== */
+        .stats-bar {
+            display: flex;
+            gap: var(--space-lg);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--color-text-secondary);
+        }
+
+        .stat-item {
+            display: flex;
+            gap: var(--space-xs);
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: var(--color-text);
+        }
+
+        /* ===== Utility ===== */
+        .hidden {
+            display: none !important;
+        }
+
+        /* ===== Scrollbar ===== */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--color-border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--color-muted);
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-top">
+                <h1 class="header-title">URL批量过滤工具</h1>
+                <div class="header-status" id="status">准备就绪</div>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-primary" id="btnStart">开始处理</button>
+                <button class="btn btn-secondary" id="btnPause">暂停</button>
+                <button class="btn btn-secondary" id="btnExportTxt">导出TXT</button>
+                <button class="btn btn-secondary" id="btnExportXlsx">导出XLSX</button>
+                <div style="flex:1"></div>
+                <button class="btn btn-ghost" id="btnClearInput">清空输入</button>
+                <button class="btn btn-ghost" id="btnClearLog">清空日志</button>
+            </div>
+        </header>
+
+        <!-- Main -->
+        <div class="main">
+            <!-- Sidebar: Filter Rules -->
+            <aside class="sidebar">
+                <div class="section">
+                    <div class="section-title">基础过滤</div>
+                    <div class="section-item">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="chkGov" checked>
+                            <span>过滤政府域名</span>
+                        </label>
+                    </div>
+                    <div class="section-item">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="chkBlack" checked>
+                            <span>启用黑名单</span>
+                        </label>
+                    </div>
+                    <div class="section-item">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="chkWhite" checked>
+                            <span>启用白名单</span>
+                        </label>
+                    </div>
+                    <div class="section-item">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="chkDedup" checked>
+                            <span>URL重复筛选</span>
+                        </label>
+                    </div>
+                    <div class="section-item">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="chkProto" checked>
+                            <span>仅保留HOST筛选</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">关键词过滤</div>
+                    <div class="section-item">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="chkKeyword">
+                            <span>启用关键词过滤</span>
+                        </label>
+                        <div class="input-group">
+                            <input type="text" class="input-field" id="entryKeyword" placeholder="输入关键词" disabled>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">状态码检测</div>
+                    <div class="section-item">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="chkStatus">
+                            <span>启用状态码检测</span>
+                        </label>
+                        <div class="input-group">
+                            <label>状态码</label>
+                            <input type="text" class="input-field" id="entryCodes" value="200,301,302" disabled>
+                        </div>
+                        <div class="input-group">
+                            <label>超时</label>
+                            <input type="text" class="input-field" id="entryTimeout" value="5" disabled>
+                        </div>
+                        <div class="input-group">
+                            <label>线程</label>
+                            <input type="text" class="input-field" id="entryThreads" value="20" disabled>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">域名列表</div>
+                    <div class="section-item">
+                        <button class="btn btn-secondary btn-sm" id="btnLoadBlack" style="width:100%">加载黑名单</button>
+                        <input type="file" id="fileBlack" accept=".txt" style="display:none">
+                    </div>
+                    <div class="section-item">
+                        <button class="btn btn-secondary btn-sm" id="btnLoadWhite" style="width:100%">加载白名单</button>
+                        <input type="file" id="fileWhite" accept=".txt" style="display:none">
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Content -->
+            <div class="content">
+                <div class="workspace">
+                    <!-- Input Panel -->
+                    <div class="panel" style="flex: 1.2;">
+                        <div class="panel-header">
+                            <span class="panel-title">URL输入</span>
+                            <span style="display:flex;gap:8px;align-items:center">
+                                <button class="btn btn-secondary btn-sm" id="btnImport">导入文件</button>
+                                <input type="file" id="fileImport" accept=".txt,.xlsx,.xls,.csv" style="display:none">
+                                <span class="panel-title" id="inputCount" style="font-weight:400; text-transform:none; letter-spacing:0;">0 个域名</span>
+                            </span>
+                        </div>
+                        <div class="panel-body">
+                            <textarea id="inputArea" placeholder="在此粘贴域名列表，每行一个...&#10;&#10;example.com&#10;https://test.com&#10;http://192.168.1.1:8080"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Results & Logs -->
+                    <div class="split-horizontal" style="flex: 1;">
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">处理结果</span>
+                            </div>
+                            <div class="panel-body">
+                                <textarea id="resultArea" placeholder="处理结果将显示在这里..." readonly></textarea>
+                            </div>
+                        </div>
+                        <div class="panel">
+                            <div class="panel-header">
+                                <span class="panel-title">处理日志</span>
+                                <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--color-text-secondary);cursor:pointer">
+                                    <input type="checkbox" id="chkFilterLog" style="cursor:pointer">
+                                    <span>仅过滤</span>
+                                </label>
+                            </div>
+                            <div class="panel-body">
+                                <textarea id="logArea" placeholder="处理日志..." readonly></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer: Stats -->
+        <footer class="footer">
+            <div class="stats-bar" id="statsBar">
+                <div class="stat-item">总数:<span class="stat-value" id="statTotal">0</span></div>
+                <div class="stat-item">保留:<span class="stat-value" id="statKeep">0</span></div>
+                <div class="stat-item">政府:<span class="stat-value" id="statGov">0</span></div>
+                <div class="stat-item">黑名单:<span class="stat-value" id="statBlack">0</span></div>
+                <div class="stat-item">白名单:<span class="stat-value" id="statWhite">0</span></div>
+                <div class="stat-item">关键词:<span class="stat-value" id="statKeyword">0</span></div>
+                <div class="stat-item">状态码:<span class="stat-value" id="statStatus">0</span></div>
+                <div class="stat-item">重复:<span class="stat-value" id="statDup">0</span></div>
+                <div class="stat-item">无效:<span class="stat-value" id="statInvalid">0</span></div>
+            </div>
+        </footer>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>
