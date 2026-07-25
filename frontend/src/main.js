@@ -1,4 +1,4 @@
-import { StartProcessing, GetProcessingState, GetProcessingResult, LoadConfig, SaveConfig, PauseProcessing, ResumeProcessing, CancelProcessing, ExtractAssets, LoadTscanPlusResult, LoadBlacklist, LoadWhitelist, SetBlacklist, SetWhitelist, ParseURLFile, ParseCSVFile, ParseExcelFile, ExportTxt, ExportXlsx } from '../wailsjs/go/main/App';
+import { StartProcessing, GetProcessingState, GetProcessingResult, LoadConfig, SaveConfig, PauseProcessing, ResumeProcessing, CancelProcessing, ExtractAssets, LoadBlacklist, LoadWhitelist, SetBlacklist, SetWhitelist, ParseURLFile, ParseCSVFile, ParseExcelFile, ExportTxt, ExportXlsx } from '../wailsjs/go/main/App';
 
 // ===== DOM Elements =====
 const inputArea = document.getElementById('inputArea');
@@ -11,11 +11,11 @@ const filterPage = document.getElementById('filterPage');
 const assetPage = document.getElementById('assetPage');
 const btnPageFilter = document.getElementById('btnPageFilter');
 const btnPageAssets = document.getElementById('btnPageAssets');
+const filterHeaderActions = document.getElementById('filterHeaderActions');
 const assetInput = document.getElementById('assetInput');
 const chkFilterPrivate = document.getElementById('chkFilterPrivate');
 const btnExtractAssets = document.getElementById('btnExtractAssets');
 const btnClearAssets = document.getElementById('btnClearAssets');
-const btnLoadTscan = document.getElementById('btnLoadTscan');
 
 const btnStart = document.getElementById('btnStart');
 const btnPause = document.getElementById('btnPause');
@@ -57,6 +57,7 @@ function switchPage(page) {
     assetPage.classList.toggle('hidden', !isAssets);
     btnPageFilter.classList.toggle('active', !isAssets);
     btnPageAssets.classList.toggle('active', isAssets);
+    filterHeaderActions.classList.toggle('hidden', isAssets);
     headerTitle.textContent = isAssets
         ? '一键提取资产中的主域名、子域名、IP、URL'
         : 'URL批量过滤工具';
@@ -76,7 +77,7 @@ btnExtractAssets.addEventListener('click', async () => {
     try {
         const result = await ExtractAssets(input, chkFilterPrivate.checked);
         renderAssetResults(result);
-        statusEl.textContent = `提取完成：${result.URLs.length + result.RootDomains.length + result.IPs.length} 项资产`;
+        statusEl.textContent = `提取完成：${result.URLs.length + result.RootDomains.length + result.Subdomains.length + result.IPs.length} 项资产`;
     } catch (err) {
         console.error(err);
         statusEl.textContent = `资产提取失败: ${err.message}`;
@@ -87,21 +88,8 @@ btnExtractAssets.addEventListener('click', async () => {
 
 btnClearAssets.addEventListener('click', () => {
     assetInput.value = '';
-    renderAssetResults({ URLs: [], RootDomains: [], IPs: [], CNetworks: [], Other: [] });
+    renderAssetResults({ URLs: [], RootDomains: [], Subdomains: [], IPs: [], CNetworks: [] });
     statusEl.textContent = '已清空资产输入';
-});
-
-btnLoadTscan.addEventListener('click', async () => {
-    btnLoadTscan.disabled = true;
-    try {
-        assetInput.value = await LoadTscanPlusResult();
-        statusEl.textContent = '已读取 TscanPlus-Result.txt';
-    } catch (err) {
-        console.error(err);
-        statusEl.textContent = `读取 TscanPlus 结果失败: ${err.message}`;
-    } finally {
-        btnLoadTscan.disabled = false;
-    }
 });
 
 document.querySelectorAll('.asset-copy').forEach(button => {
@@ -454,9 +442,9 @@ function renderAssetResults(result) {
     const groups = [
         ['assetUrls', 'assetCountUrls', result?.URLs || []],
         ['assetDomains', 'assetCountDomains', result?.RootDomains || []],
+        ['assetSubdomains', 'assetCountSubdomains', result?.Subdomains || []],
         ['assetIps', 'assetCountIps', result?.IPs || []],
         ['assetCnets', 'assetCountCnets', result?.CNetworks || []],
-        ['assetOther', 'assetCountOther', result?.Other || []],
     ];
     groups.forEach(([textId, countId, values]) => {
         document.getElementById(textId).value = values.join('\n');

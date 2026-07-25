@@ -84,9 +84,9 @@ type ProcessingState struct {
 type AssetExtractionResult struct {
 	URLs        []string
 	RootDomains []string
+	Subdomains  []string
 	IPs         []string
 	CNetworks   []string
-	Other       []string
 }
 
 const (
@@ -946,10 +946,7 @@ var (
 	assetIPv4Pattern       = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
 	assetDomainPattern     = regexp.MustCompile(`(?i)\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}\b`)
 	assetDomainHostPattern = regexp.MustCompile(`(?i)^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}$`)
-	assetHostPortPattern   = regexp.MustCompile(`(?i)\b(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|(?:\d{1,3}\.){3}\d{1,3}):\d{1,5}\b`)
 )
-
-const defaultTscanPlusResultPath = `D:\ns-tools\TscanPlus\TscanPlus-Result.txt`
 
 func isPrivateAssetIP(raw string) bool {
 	ip := net.ParseIP(raw)
@@ -969,6 +966,18 @@ func assetRootDomain(host string) string {
 		return ""
 	}
 	return strings.ToLower(strings.TrimSuffix(root, "."))
+}
+
+func assetSubdomain(host string) string {
+	host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), "."))
+	if !assetDomainHostPattern.MatchString(host) {
+		return ""
+	}
+	root := assetRootDomain(host)
+	if root == "" || host == root {
+		return ""
+	}
+	return host
 }
 
 func assetDomainIsInPath(line string, start int) bool {
@@ -1005,12 +1014,12 @@ func (a *App) ExtractAssets(input string, filterPrivate bool) AssetExtractionRes
 	result := AssetExtractionResult{
 		URLs:        []string{},
 		RootDomains: []string{},
+		Subdomains:  []string{},
 		IPs:         []string{},
 		CNetworks:   []string{},
-		Other:       []string{},
 	}
 	seen := map[string]map[string]bool{
-		"url": {}, "domain": {}, "ip": {}, "c": {}, "other": {},
+		"url": {}, "domain": {}, "subdomain": {}, "ip": {}, "c": {},
 	}
 	add := func(kind, value string) {
 		value = strings.TrimSpace(value)
@@ -1023,12 +1032,12 @@ func (a *App) ExtractAssets(input string, filterPrivate bool) AssetExtractionRes
 			result.URLs = append(result.URLs, value)
 		case "domain":
 			result.RootDomains = append(result.RootDomains, value)
+		case "subdomain":
+			result.Subdomains = append(result.Subdomains, value)
 		case "ip":
 			result.IPs = append(result.IPs, value)
 		case "c":
 			result.CNetworks = append(result.CNetworks, value)
-		case "other":
-			result.Other = append(result.Other, value)
 		}
 	}
 	addIP := func(raw string) {
@@ -1064,14 +1073,11 @@ func (a *App) ExtractAssets(input string, filterPrivate bool) AssetExtractionRes
 				addIP(host)
 			} else if domain := assetRootDomain(host); domain != "" {
 				add("domain", domain)
+				if subdomain := assetSubdomain(host); subdomain != "" {
+					add("subdomain", subdomain)
+				}
 			}
 			add("url", normalized)
-			if port := parsed.Port(); port != "" {
-				add("other", host+":"+port)
-			}
-			if requestURI := parsed.RequestURI(); requestURI != "" && requestURI != "/" {
-				add("other", host+requestURI)
-			}
 		}
 
 		for _, rawIP := range assetIPv4Pattern.FindAllString(string(maskedLine), -1) {
@@ -1084,29 +1090,13 @@ func (a *App) ExtractAssets(input string, filterPrivate bool) AssetExtractionRes
 			rawDomain := string(maskedLine[match[0]:match[1]])
 			if domain := assetRootDomain(rawDomain); domain != "" {
 				add("domain", domain)
-			}
-		}
-		for _, hostPort := range assetHostPortPattern.FindAllString(string(maskedLine), -1) {
-			parts := strings.Split(hostPort, ":")
-			port, err := strconv.Atoi(parts[len(parts)-1])
-			if err == nil && port >= 1 && port <= 65535 {
-				if ip := net.ParseIP(parts[0]); ip != nil && filterPrivate && isPrivateAssetIP(parts[0]) {
-					continue
+				if subdomain := assetSubdomain(rawDomain); subdomain != "" {
+					add("subdomain", subdomain)
 				}
-				add("other", hostPort)
 			}
 		}
 	}
 	return result
-}
-
-// LoadTscanPlusResult reads the default local TscanPlus result file.
-func (a *App) LoadTscanPlusResult() (string, error) {
-	data, err := os.ReadFile(defaultTscanPlusResultPath)
-	if err != nil {
-		return "", fmt.Errorf("read TscanPlus result: %w", err)
-	}
-	return string(data), nil
 }
 
 // normalizeURL 规范化URL

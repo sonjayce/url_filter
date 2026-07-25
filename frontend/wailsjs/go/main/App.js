@@ -38,10 +38,6 @@ export function LoadConfig() {
   return window['go']['main']['App']['LoadConfig']();
 }
 
-export function LoadTscanPlusResult() {
-  return window['go']['main']['App']['LoadTscanPlusResult']();
-}
-
 export function LoadWhitelist(arg1) {
   return window['go']['main']['App']['LoadWhitelist'](arg1);
 }

@@ -83,14 +83,14 @@ http://invalid.example.com:99999`
 	if !containsString(got.RootDomains, "example.com") {
 		t.Fatalf("expected root domain, got %#v", got.RootDomains)
 	}
+	if !containsString(got.Subdomains, "public.example.com") || !containsString(got.Subdomains, "sub.example.com") || !containsString(got.Subdomains, "foo.example.com") {
+		t.Fatalf("expected subdomains, got %#v", got.Subdomains)
+	}
 	if containsString(got.IPs, "192.168.1.10") {
 		t.Fatalf("private IP should be filtered, got %#v", got.IPs)
 	}
 	if !containsString(got.IPs, "8.8.8.8") || !containsString(got.CNetworks, "8.8.8.0/24") {
 		t.Fatalf("expected public IP and C network, got IPs=%#v CNetworks=%#v", got.IPs, got.CNetworks)
-	}
-	if !containsString(got.Other, "public.example.com:8080") || !containsString(got.Other, "public.example.com/api?id=1") || !containsString(got.Other, "8.8.8.8:53") {
-		t.Fatalf("expected other asset details, got %#v", got.Other)
 	}
 	if containsString(got.URLs, "http://invalid.example.com:99999") {
 		t.Fatalf("invalid port URL should not be extracted, got %#v", got.URLs)

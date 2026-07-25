@@ -39,9 +39,9 @@ export namespace main {
 	export class AssetExtractionResult {
 	    URLs: string[];
 	    RootDomains: string[];
+	    Subdomains: string[];
 	    IPs: string[];
 	    CNetworks: string[];
-	    Other: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new AssetExtractionResult(source);
@@ -51,9 +51,9 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.URLs = source["URLs"];
 	        this.RootDomains = source["RootDomains"];
+	        this.Subdomains = source["Subdomains"];
 	        this.IPs = source["IPs"];
 	        this.CNetworks = source["CNetworks"];
-	        this.Other = source["Other"];
 	    }
 	}
 	export class Counters {

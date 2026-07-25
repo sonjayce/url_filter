@@ -20,8 +20,6 @@ export function LoadBlacklist(arg1:string):Promise<Array<string>>;
 
 export function LoadConfig():Promise<main.AppConfig>;
 
-export function LoadTscanPlusResult():Promise<string>;
-
 export function LoadWhitelist(arg1:string):Promise<Array<string>>;
 
 export function ParseCSVFile(arg1:string):Promise<Array<string>>;

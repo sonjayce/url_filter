@@ -539,7 +539,7 @@
                 </nav>
                 <div class="header-status" id="status">准备就绪</div>
             </div>
-            <div class="header-actions">
+            <div class="header-actions" id="filterHeaderActions">
                 <button class="btn btn-primary" id="btnStart">开始处理</button>
                 <button class="btn btn-secondary" id="btnPause" disabled>暂停</button>
                 <button class="btn btn-secondary" id="btnCancel" disabled>取消</button>
@@ -689,7 +689,6 @@
                     <div class="asset-page-title">一键提取资产中的主域名、子域名、IP、URL</div>
                     <div class="asset-page-subtitle">支持粘贴 TscanPlus 日志、扫描结果或混合资产文本；只做本地解析，不启动扫描。</div>
                 </div>
-                <button class="btn btn-secondary" id="btnLoadTscan">读取 TscanPlus 结果</button>
             </div>
 
             <textarea class="asset-input" id="assetInput" placeholder="粘贴主域名、子域名、IP、URL 或 TscanPlus-Result.txt 内容..."></textarea>
@@ -710,16 +709,16 @@
                     <textarea id="assetDomains" readonly placeholder="根域名 / 主域名"></textarea>
                 </div>
                 <div class="asset-result-panel">
+                    <div class="asset-result-header"><span>子域名</span><span><span class="asset-result-count" id="assetCountSubdomains">0</span> <button class="btn btn-ghost btn-sm asset-copy" data-target="assetSubdomains">复制</button></span></div>
+                    <textarea id="assetSubdomains" readonly placeholder="子域名"></textarea>
+                </div>
+                <div class="asset-result-panel">
                     <div class="asset-result-header"><span>IP地址</span><span><span class="asset-result-count" id="assetCountIps">0</span> <button class="btn btn-ghost btn-sm asset-copy" data-target="assetIps">复制</button></span></div>
                     <textarea id="assetIps" readonly placeholder="IPv4 地址"></textarea>
                 </div>
                 <div class="asset-result-panel">
                     <div class="asset-result-header"><span>C段地址</span><span><span class="asset-result-count" id="assetCountCnets">0</span> <button class="btn btn-ghost btn-sm asset-copy" data-target="assetCnets">复制</button></span></div>
                     <textarea id="assetCnets" readonly placeholder="IPv4 /24 网段"></textarea>
-                </div>
-                <div class="asset-result-panel">
-                    <div class="asset-result-header"><span>其他信息</span><span><span class="asset-result-count" id="assetCountOther">0</span> <button class="btn btn-ghost btn-sm asset-copy" data-target="assetOther">复制</button></span></div>
-                    <textarea id="assetOther" readonly placeholder="端口、路径、参数等"></textarea>
                 </div>
             </div>
         </section>
