@@ -1,4 +1,4 @@
-import { ProcessURLs, LoadBlacklist, LoadWhitelist, SetBlacklist, SetWhitelist, ParseURLFile, ParseExcelFile, ExportTxt, ExportXlsx } from '../wailsjs/go/main/App';
+import { StartProcessing, GetProcessingState, GetProcessingResult, LoadConfig, SaveConfig, PauseProcessing, ResumeProcessing, CancelProcessing, ExtractAssets, LoadTscanPlusResult, LoadBlacklist, LoadWhitelist, SetBlacklist, SetWhitelist, ParseURLFile, ParseCSVFile, ParseExcelFile, ExportTxt, ExportXlsx } from '../wailsjs/go/main/App';
 
 // ===== DOM Elements =====
 const inputArea = document.getElementById('inputArea');
@@ -6,9 +6,20 @@ const resultArea = document.getElementById('resultArea');
 const logArea = document.getElementById('logArea');
 const statusEl = document.getElementById('status');
 const inputCount = document.getElementById('inputCount');
+const headerTitle = document.querySelector('.header-title');
+const filterPage = document.getElementById('filterPage');
+const assetPage = document.getElementById('assetPage');
+const btnPageFilter = document.getElementById('btnPageFilter');
+const btnPageAssets = document.getElementById('btnPageAssets');
+const assetInput = document.getElementById('assetInput');
+const chkFilterPrivate = document.getElementById('chkFilterPrivate');
+const btnExtractAssets = document.getElementById('btnExtractAssets');
+const btnClearAssets = document.getElementById('btnClearAssets');
+const btnLoadTscan = document.getElementById('btnLoadTscan');
 
 const btnStart = document.getElementById('btnStart');
 const btnPause = document.getElementById('btnPause');
+const btnCancel = document.getElementById('btnCancel');
 const btnExportTxt = document.getElementById('btnExportTxt');
 const btnExportXlsx = document.getElementById('btnExportXlsx');
 const btnImport = document.getElementById('btnImport');
@@ -34,9 +45,84 @@ const entryThreads = document.getElementById('entryThreads');
 // ===== State =====
 let isProcessing = false;
 let isPaused = false;
+let isCancelRequested = false;
 let blacklistDomains = [];
 let whitelistDomains = [];
 let allLogLines = [];
+let configSaveTimer = null;
+
+function switchPage(page) {
+    const isAssets = page === 'assets';
+    filterPage.classList.toggle('hidden', isAssets);
+    assetPage.classList.toggle('hidden', !isAssets);
+    btnPageFilter.classList.toggle('active', !isAssets);
+    btnPageAssets.classList.toggle('active', isAssets);
+    headerTitle.textContent = isAssets
+        ? '一键提取资产中的主域名、子域名、IP、URL'
+        : 'URL批量过滤工具';
+}
+
+btnPageFilter.addEventListener('click', () => switchPage('filter'));
+btnPageAssets.addEventListener('click', () => switchPage('assets'));
+
+btnExtractAssets.addEventListener('click', async () => {
+    const input = assetInput.value.trim();
+    if (!input) {
+        statusEl.textContent = '请先粘贴待处理的资产文本';
+        return;
+    }
+    btnExtractAssets.disabled = true;
+    statusEl.textContent = '正在提取资产...';
+    try {
+        const result = await ExtractAssets(input, chkFilterPrivate.checked);
+        renderAssetResults(result);
+        statusEl.textContent = `提取完成：${result.URLs.length + result.RootDomains.length + result.IPs.length} 项资产`;
+    } catch (err) {
+        console.error(err);
+        statusEl.textContent = `资产提取失败: ${err.message}`;
+    } finally {
+        btnExtractAssets.disabled = false;
+    }
+});
+
+btnClearAssets.addEventListener('click', () => {
+    assetInput.value = '';
+    renderAssetResults({ URLs: [], RootDomains: [], IPs: [], CNetworks: [], Other: [] });
+    statusEl.textContent = '已清空资产输入';
+});
+
+btnLoadTscan.addEventListener('click', async () => {
+    btnLoadTscan.disabled = true;
+    try {
+        assetInput.value = await LoadTscanPlusResult();
+        statusEl.textContent = '已读取 TscanPlus-Result.txt';
+    } catch (err) {
+        console.error(err);
+        statusEl.textContent = `读取 TscanPlus 结果失败: ${err.message}`;
+    } finally {
+        btnLoadTscan.disabled = false;
+    }
+});
+
+document.querySelectorAll('.asset-copy').forEach(button => {
+    button.addEventListener('click', async () => {
+        const target = document.getElementById(button.dataset.target);
+        const content = target.value.trim();
+        if (!content) {
+            statusEl.textContent = '当前分类没有可复制内容';
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(content);
+            statusEl.textContent = '已复制当前分类结果';
+        } catch (err) {
+            target.focus();
+            target.select();
+            document.execCommand('copy');
+            statusEl.textContent = '已复制当前分类结果';
+        }
+    });
+});
 
 // ===== Event Listeners =====
 
@@ -50,6 +136,7 @@ inputArea.addEventListener('input', () => {
 chkKeyword.addEventListener('change', () => {
     entryKeyword.disabled = !chkKeyword.checked;
     if (!chkKeyword.checked) entryKeyword.value = '';
+    scheduleConfigSave();
 });
 
 // Status toggle
@@ -58,6 +145,14 @@ chkStatus.addEventListener('change', () => {
     entryCodes.disabled = !enabled;
     entryTimeout.disabled = !enabled;
     entryThreads.disabled = !enabled;
+    scheduleConfigSave();
+});
+
+[chkGov, chkBlack, chkWhite, chkDedup, chkProto].forEach(element => {
+    element.addEventListener('change', scheduleConfigSave);
+});
+[entryKeyword, entryCodes, entryTimeout, entryThreads].forEach(element => {
+    element.addEventListener('input', scheduleConfigSave);
 });
 
 // Start processing
@@ -71,9 +166,12 @@ btnStart.addEventListener('click', async () => {
     }
 
     isProcessing = true;
+    isPaused = false;
+    isCancelRequested = false;
     btnStart.disabled = true;
     btnStart.textContent = '处理中...';
     statusEl.textContent = '正在处理中...';
+    updateProcessingControls();
 
     // Clear previous results
     resultArea.value = '';
@@ -97,7 +195,9 @@ btnStart.addEventListener('click', async () => {
     };
 
     try {
-        const result = await ProcessURLs(input, opts);
+        await persistConfig();
+        await StartProcessing(input, opts);
+        const result = await waitForProcessingResult();
         resultArea.value = result.Results.join('\n');
         updateStats(result.Counters);
 
@@ -105,23 +205,51 @@ btnStart.addEventListener('click', async () => {
         allLogLines = result.Logs || [];
         applyLogFilter();
 
-        statusEl.textContent = `完成！保留 ${result.Results.length} 条`;
+        statusEl.textContent = result.Canceled
+            ? `已取消，保留 ${result.Results.length} 条`
+            : `完成！保留 ${result.Results.length} 条`;
     } catch (err) {
         console.error(err);
         statusEl.textContent = `错误: ${err.message}`;
     } finally {
         isProcessing = false;
+        isPaused = false;
+        isCancelRequested = false;
         btnStart.disabled = false;
         btnStart.textContent = '开始处理';
+        updateProcessingControls();
     }
 });
 
-// Pause/Resume
-btnPause.addEventListener('click', () => {
-    isPaused = !isPaused;
-    btnPause.textContent = isPaused ? '继续' : '暂停';
-    statusEl.textContent = isPaused ? '已暂停' : '正在处理中...';
-    log(isPaused ? '暂停' : '继续', isPaused ? '用户暂停了任务' : '用户恢复了任务');
+btnPause.addEventListener('click', async () => {
+    if (!isProcessing || isCancelRequested) return;
+    try {
+        const changed = isPaused ? await ResumeProcessing() : await PauseProcessing();
+        if (!changed) return;
+        isPaused = !isPaused;
+        btnPause.textContent = isPaused ? '继续' : '暂停';
+        statusEl.textContent = isPaused ? '已暂停' : '正在处理中...';
+        updateProcessingControls();
+    } catch (err) {
+        console.error(err);
+        statusEl.textContent = `控制任务失败: ${err.message}`;
+    }
+});
+
+btnCancel.addEventListener('click', async () => {
+    if (!isProcessing || isCancelRequested) return;
+    isCancelRequested = true;
+    btnCancel.disabled = true;
+    btnPause.disabled = true;
+    statusEl.textContent = '正在取消...';
+    try {
+        await CancelProcessing();
+    } catch (err) {
+        console.error(err);
+        statusEl.textContent = `取消失败: ${err.message}`;
+        isCancelRequested = false;
+        updateProcessingControls();
+    }
 });
 
 btnExportTxt.addEventListener('click', async () => {
@@ -192,49 +320,55 @@ document.getElementById('fileImport').addEventListener('change', async (e) => {
     if (!file) return;
 
     const fileName = file.name.toLowerCase();
-    const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+    const isExcel = fileName.endsWith('.xlsx');
+    const isLegacyExcel = fileName.endsWith('.xls');
     const isCsv = fileName.endsWith('.csv');
 
     let hosts = [];
 
-    if (isExcel) {
-        // 读取 Excel 文件为 base64
-        const arrayBuffer = await file.arrayBuffer();
-        const bytes = new Uint8Array(arrayBuffer);
-        let binary = '';
-        for (let i = 0; i < bytes.length; i++) {
-            binary += String.fromCharCode(bytes[i]);
+    try {
+        if (isLegacyExcel) {
+            throw new Error('暂不支持 .xls 文件，请另存为 .xlsx 后再导入');
         }
-        const base64Data = btoa(binary);
-        hosts = await ParseExcelFile(base64Data);
-        log('导入', `Excel 导入 ${hosts.length} 条`);
-    } else {
-        // TXT / CSV 文件
-        const content = await file.text();
-        if (isCsv) {
-            // CSV 特殊处理：跳过第一行表头，按逗号分割
-            const lines = content.split('\n').slice(1);
-            const csvContent = lines.join('\n');
-            hosts = await ParseURLFile(csvContent);
+
+        if (isExcel) {
+            // 读取 XLSX 文件为 base64
+            const arrayBuffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i += 0x8000) {
+                binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+            }
+            hosts = await ParseExcelFile(btoa(binary));
+            log('导入', `XLSX 导入 ${hosts.length} 条`);
         } else {
-            hosts = await ParseURLFile(content);
+            const content = await file.text();
+            if (isCsv) {
+                hosts = await ParseCSVFile(content);
+            } else {
+                hosts = await ParseURLFile(content);
+            }
+            log('导入', `文件导入 ${hosts.length} 条`);
         }
-        log('导入', `文件导入 ${hosts.length} 条`);
+
+        // 追加到现有输入
+        const existing = inputArea.value.trim();
+        if (existing) {
+            inputArea.value = existing + '\n' + hosts.join('\n');
+        } else {
+            inputArea.value = hosts.join('\n');
+        }
+
+        const total = inputArea.value.split('\n').filter(l => l.trim()).length;
+        inputCount.textContent = `${total} 个域名`;
+        statusEl.textContent = `已导入 ${hosts.length} 条`;
+    } catch (err) {
+        console.error(err);
+        statusEl.textContent = `导入失败: ${err.message}`;
+        alert(`导入失败: ${err.message}`);
+    } finally {
+        e.target.value = '';
     }
-
-    // 追加到现有输入
-    const existing = inputArea.value.trim();
-    if (existing) {
-        inputArea.value = existing + '\n' + hosts.join('\n');
-    } else {
-        inputArea.value = hosts.join('\n');
-    }
-
-    const total = inputArea.value.split('\n').filter(l => l.trim()).length;
-    inputCount.textContent = `${total} 个域名`;
-    statusEl.textContent = `已导入 ${hosts.length} 条`;
-
-    e.target.value = '';
 });
 
 // Clear input
@@ -289,6 +423,7 @@ document.getElementById('fileBlack').addEventListener('change', async (e) => {
         .filter(l => l.length > 0);
     await SetBlacklist(blacklistDomains);
     log('黑名单', `加载完成: ${blacklistDomains.length} 条`);
+    scheduleConfigSave();
 
     e.target.value = '';
 });
@@ -308,11 +443,108 @@ document.getElementById('fileWhite').addEventListener('change', async (e) => {
         .filter(l => l.length > 0);
     await SetWhitelist(whitelistDomains);
     log('白名单', `加载完成: ${whitelistDomains.length} 条`);
+    scheduleConfigSave();
 
     e.target.value = '';
 });
 
 // ===== Helper Functions =====
+
+function renderAssetResults(result) {
+    const groups = [
+        ['assetUrls', 'assetCountUrls', result?.URLs || []],
+        ['assetDomains', 'assetCountDomains', result?.RootDomains || []],
+        ['assetIps', 'assetCountIps', result?.IPs || []],
+        ['assetCnets', 'assetCountCnets', result?.CNetworks || []],
+        ['assetOther', 'assetCountOther', result?.Other || []],
+    ];
+    groups.forEach(([textId, countId, values]) => {
+        document.getElementById(textId).value = values.join('\n');
+        document.getElementById(countId).textContent = values.length;
+    });
+}
+
+function currentConfig() {
+    return {
+        EnableGov: chkGov.checked,
+        EnableBlack: chkBlack.checked,
+        EnableWhite: chkWhite.checked,
+        EnableDedup: chkDedup.checked,
+        EnableKeyword: chkKeyword.checked,
+        RemoveProto: chkProto.checked,
+        EnableStatus: chkStatus.checked,
+        Keyword: entryKeyword.value,
+        AllowedCodes: parseCodes(entryCodes.value),
+        Timeout: parseInt(entryTimeout.value) || 5,
+        Threads: parseInt(entryThreads.value) || 20,
+        BlackDomains: blacklistDomains,
+        WhiteDomains: whitelistDomains,
+    };
+}
+
+function applyConfig(config) {
+    chkGov.checked = !!config.EnableGov;
+    chkBlack.checked = !!config.EnableBlack;
+    chkWhite.checked = !!config.EnableWhite;
+    chkDedup.checked = !!config.EnableDedup;
+    chkProto.checked = !!config.RemoveProto;
+    chkKeyword.checked = !!config.EnableKeyword;
+    chkStatus.checked = !!config.EnableStatus;
+    entryKeyword.value = config.Keyword || '';
+    entryCodes.value = Object.keys(config.AllowedCodes || {}).filter(code => config.AllowedCodes[code]).join(',');
+    entryTimeout.value = config.Timeout || 5;
+    entryThreads.value = config.Threads || 20;
+    blacklistDomains = Array.isArray(config.BlackDomains) ? config.BlackDomains : [];
+    whitelistDomains = Array.isArray(config.WhiteDomains) ? config.WhiteDomains : [];
+
+    entryKeyword.disabled = !chkKeyword.checked;
+    entryTimeout.disabled = !chkStatus.checked;
+    entryThreads.disabled = !chkStatus.checked;
+    entryCodes.disabled = !chkStatus.checked;
+}
+
+async function initializeConfig() {
+    try {
+        const config = await LoadConfig();
+        applyConfig(config);
+        await SetBlacklist(blacklistDomains);
+        await SetWhitelist(whitelistDomains);
+    } catch (err) {
+        console.error(err);
+        statusEl.textContent = `配置加载失败: ${err.message}`;
+    }
+}
+
+async function persistConfig() {
+    await SaveConfig(currentConfig());
+}
+
+function scheduleConfigSave() {
+    if (configSaveTimer !== null) clearTimeout(configSaveTimer);
+    configSaveTimer = setTimeout(() => {
+        configSaveTimer = null;
+        persistConfig().catch(err => console.error('配置保存失败', err));
+    }, 300);
+}
+
+function updateProcessingControls() {
+    btnPause.disabled = !isProcessing || isCancelRequested;
+    btnCancel.disabled = !isProcessing || isCancelRequested;
+    btnPause.textContent = isPaused ? '继续' : '暂停';
+}
+
+async function waitForProcessingResult() {
+    while (true) {
+        const state = await GetProcessingState();
+        if (!state.Active) {
+            throw new Error('处理任务不存在');
+        }
+        if (state.Finished) {
+            return await GetProcessingResult();
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+}
 
 function parseCodes(codesStr) {
     const codes = {};
@@ -349,3 +581,6 @@ function log(type, message) {
     logArea.value += `[${time}] [${type}] ${message}\n`;
     logArea.scrollTop = logArea.scrollHeight;
 }
+
+updateProcessingControls();
+initializeConfig();

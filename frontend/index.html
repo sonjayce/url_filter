@@ -78,6 +78,29 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: var(--space-lg);
+        }
+
+        .page-tabs {
+            display: flex;
+            gap: var(--space-xs);
+            margin-left: auto;
+        }
+
+        .page-tab {
+            padding: var(--space-xs) var(--space-md);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            background: var(--color-surface);
+            color: var(--color-text-secondary);
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .page-tab.active,
+        .page-tab:hover {
+            border-color: var(--color-accent);
+            color: var(--color-accent);
         }
 
         .header-title {
@@ -370,6 +393,120 @@
             display: none !important;
         }
 
+        /* ===== Asset Sorting Page ===== */
+        .asset-page {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
+            padding: var(--space-lg);
+            overflow: hidden;
+        }
+
+        .asset-page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-md);
+        }
+
+        .asset-page-title {
+            font-size: 17px;
+            font-weight: 700;
+        }
+
+        .asset-page-subtitle {
+            color: var(--color-text-secondary);
+            font-size: 12px;
+        }
+
+        .asset-input {
+            min-height: 170px;
+            flex: 0 0 170px;
+            padding: var(--space-md);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            resize: none;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            line-height: 1.6;
+            outline: none;
+        }
+
+        .asset-input:focus {
+            border-color: var(--color-accent);
+        }
+
+        .asset-actions {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .asset-actions label {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-xs);
+            margin-left: auto;
+            color: var(--color-text-secondary);
+            font-size: 13px;
+        }
+
+        .asset-results {
+            flex: 1;
+            min-height: 0;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: var(--space-md);
+        }
+
+        .asset-result-panel {
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+        }
+
+        .asset-result-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--space-sm) var(--space-md);
+            border-bottom: 1px solid var(--color-border);
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .asset-result-count {
+            color: var(--color-muted);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 400;
+        }
+
+        .asset-result-panel textarea {
+            flex: 1;
+            width: 100%;
+            min-height: 0;
+            padding: var(--space-md);
+            border: none;
+            resize: none;
+            outline: none;
+            background: transparent;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 900px) {
+            .asset-results {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
         /* ===== Scrollbar ===== */
         ::-webkit-scrollbar {
             width: 8px;
@@ -396,11 +533,16 @@
         <header class="header">
             <div class="header-top">
                 <h1 class="header-title">URL批量过滤工具</h1>
+                <nav class="page-tabs" aria-label="功能分页">
+                    <button class="page-tab active" id="btnPageFilter">URL过滤</button>
+                    <button class="page-tab" id="btnPageAssets">资产分拣</button>
+                </nav>
                 <div class="header-status" id="status">准备就绪</div>
             </div>
             <div class="header-actions">
                 <button class="btn btn-primary" id="btnStart">开始处理</button>
-                <button class="btn btn-secondary" id="btnPause">暂停</button>
+                <button class="btn btn-secondary" id="btnPause" disabled>暂停</button>
+                <button class="btn btn-secondary" id="btnCancel" disabled>取消</button>
                 <button class="btn btn-secondary" id="btnExportTxt">导出TXT</button>
                 <button class="btn btn-secondary" id="btnExportXlsx">导出XLSX</button>
                 <div style="flex:1"></div>
@@ -410,7 +552,7 @@
         </header>
 
         <!-- Main -->
-        <div class="main">
+        <div class="main" id="filterPage">
             <!-- Sidebar: Filter Rules -->
             <aside class="sidebar">
                 <div class="section">
@@ -504,7 +646,7 @@
                             <span class="panel-title">URL输入</span>
                             <span style="display:flex;gap:8px;align-items:center">
                                 <button class="btn btn-secondary btn-sm" id="btnImport">导入文件</button>
-                                <input type="file" id="fileImport" accept=".txt,.xlsx,.xls,.csv" style="display:none">
+                                <input type="file" id="fileImport" accept=".txt,.xlsx,.csv" style="display:none">
                                 <span class="panel-title" id="inputCount" style="font-weight:400; text-transform:none; letter-spacing:0;">0 个域名</span>
                             </span>
                         </div>
@@ -539,6 +681,48 @@
                 </div>
             </div>
         </div>
+
+        <!-- Asset Sorting Page -->
+        <section class="asset-page hidden" id="assetPage">
+            <div class="asset-page-header">
+                <div>
+                    <div class="asset-page-title">一键提取资产中的主域名、子域名、IP、URL</div>
+                    <div class="asset-page-subtitle">支持粘贴 TscanPlus 日志、扫描结果或混合资产文本；只做本地解析，不启动扫描。</div>
+                </div>
+                <button class="btn btn-secondary" id="btnLoadTscan">读取 TscanPlus 结果</button>
+            </div>
+
+            <textarea class="asset-input" id="assetInput" placeholder="粘贴主域名、子域名、IP、URL 或 TscanPlus-Result.txt 内容..."></textarea>
+
+            <div class="asset-actions">
+                <button class="btn btn-primary" id="btnExtractAssets">一键提取</button>
+                <button class="btn btn-secondary" id="btnClearAssets">清空</button>
+                <label><input type="checkbox" id="chkFilterPrivate"> 过滤内网地址</label>
+            </div>
+
+            <div class="asset-results">
+                <div class="asset-result-panel">
+                    <div class="asset-result-header"><span>URL地址</span><span><span class="asset-result-count" id="assetCountUrls">0</span> <button class="btn btn-ghost btn-sm asset-copy" data-target="assetUrls">复制</button></span></div>
+                    <textarea id="assetUrls" readonly placeholder="完整 URL"></textarea>
+                </div>
+                <div class="asset-result-panel">
+                    <div class="asset-result-header"><span>主域名</span><span><span class="asset-result-count" id="assetCountDomains">0</span> <button class="btn btn-ghost btn-sm asset-copy" data-target="assetDomains">复制</button></span></div>
+                    <textarea id="assetDomains" readonly placeholder="根域名 / 主域名"></textarea>
+                </div>
+                <div class="asset-result-panel">
+                    <div class="asset-result-header"><span>IP地址</span><span><span class="asset-result-count" id="assetCountIps">0</span> <button class="btn btn-ghost btn-sm asset-copy" data-target="assetIps">复制</button></span></div>
+                    <textarea id="assetIps" readonly placeholder="IPv4 地址"></textarea>
+                </div>
+                <div class="asset-result-panel">
+                    <div class="asset-result-header"><span>C段地址</span><span><span class="asset-result-count" id="assetCountCnets">0</span> <button class="btn btn-ghost btn-sm asset-copy" data-target="assetCnets">复制</button></span></div>
+                    <textarea id="assetCnets" readonly placeholder="IPv4 /24 网段"></textarea>
+                </div>
+                <div class="asset-result-panel">
+                    <div class="asset-result-header"><span>其他信息</span><span><span class="asset-result-count" id="assetCountOther">0</span> <button class="btn btn-ghost btn-sm asset-copy" data-target="assetOther">复制</button></span></div>
+                    <textarea id="assetOther" readonly placeholder="端口、路径、参数等"></textarea>
+                </div>
+            </div>
+        </section>
 
         <!-- Footer: Stats -->
         <footer class="footer">

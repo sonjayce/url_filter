@@ -1,5 +1,61 @@
 export namespace main {
 	
+	export class AppConfig {
+	    EnableGov: boolean;
+	    EnableBlack: boolean;
+	    EnableWhite: boolean;
+	    EnableDedup: boolean;
+	    EnableKeyword: boolean;
+	    RemoveProto: boolean;
+	    EnableStatus: boolean;
+	    Keyword: string;
+	    AllowedCodes: Record<number, boolean>;
+	    Timeout: number;
+	    Threads: number;
+	    BlackDomains: string[];
+	    WhiteDomains: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AppConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.EnableGov = source["EnableGov"];
+	        this.EnableBlack = source["EnableBlack"];
+	        this.EnableWhite = source["EnableWhite"];
+	        this.EnableDedup = source["EnableDedup"];
+	        this.EnableKeyword = source["EnableKeyword"];
+	        this.RemoveProto = source["RemoveProto"];
+	        this.EnableStatus = source["EnableStatus"];
+	        this.Keyword = source["Keyword"];
+	        this.AllowedCodes = source["AllowedCodes"];
+	        this.Timeout = source["Timeout"];
+	        this.Threads = source["Threads"];
+	        this.BlackDomains = source["BlackDomains"];
+	        this.WhiteDomains = source["WhiteDomains"];
+	    }
+	}
+	export class AssetExtractionResult {
+	    URLs: string[];
+	    RootDomains: string[];
+	    IPs: string[];
+	    CNetworks: string[];
+	    Other: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AssetExtractionResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.URLs = source["URLs"];
+	        this.RootDomains = source["RootDomains"];
+	        this.IPs = source["IPs"];
+	        this.CNetworks = source["CNetworks"];
+	        this.Other = source["Other"];
+	    }
+	}
 	export class Counters {
 	    Total: number;
 	    Keep: number;
@@ -68,6 +124,7 @@ export namespace main {
 	    Results: string[];
 	    Logs: string[];
 	    Counters?: Counters;
+	    Canceled: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ProcessResult(source);
@@ -78,6 +135,7 @@ export namespace main {
 	        this.Results = source["Results"];
 	        this.Logs = source["Logs"];
 	        this.Counters = this.convertValues(source["Counters"], Counters);
+	        this.Canceled = source["Canceled"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -97,6 +155,24 @@ export namespace main {
 		    }
 		    return a;
 		}
+	}
+	export class ProcessingState {
+	    Active: boolean;
+	    Paused: boolean;
+	    CancelRequested: boolean;
+	    Finished: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProcessingState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Active = source["Active"];
+	        this.Paused = source["Paused"];
+	        this.CancelRequested = source["CancelRequested"];
+	        this.Finished = source["Finished"];
+	    }
 	}
 
 }
