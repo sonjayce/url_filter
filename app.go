@@ -1013,7 +1013,7 @@ func normalizeAssetURL(raw string) (string, *url.URL) {
 	return parsed.String(), parsed
 }
 
-// ExtractAssets extracts and categorizes assets from existing text or TscanPlus output.
+// ExtractAssets extracts and categorizes assets from mixed local text.
 // It performs no network requests and only parses local input.
 func (a *App) ExtractAssets(input string, filterPrivate bool) AssetExtractionResult {
 	result := AssetExtractionResult{
