@@ -6,12 +6,10 @@ const resultArea = document.getElementById('resultArea');
 const logArea = document.getElementById('logArea');
 const statusEl = document.getElementById('status');
 const inputCount = document.getElementById('inputCount');
-const headerTitle = document.querySelector('.header-title');
 const filterPage = document.getElementById('filterPage');
 const assetPage = document.getElementById('assetPage');
 const btnPageFilter = document.getElementById('btnPageFilter');
 const btnPageAssets = document.getElementById('btnPageAssets');
-const filterHeaderActions = document.getElementById('filterHeaderActions');
 const assetInput = document.getElementById('assetInput');
 const chkFilterPrivate = document.getElementById('chkFilterPrivate');
 const btnExtractAssets = document.getElementById('btnExtractAssets');
@@ -57,10 +55,6 @@ function switchPage(page) {
     assetPage.classList.toggle('hidden', !isAssets);
     btnPageFilter.classList.toggle('active', !isAssets);
     btnPageAssets.classList.toggle('active', isAssets);
-    filterHeaderActions.classList.toggle('hidden', isAssets);
-    headerTitle.textContent = isAssets
-        ? '一键提取资产中的主域名、子域名、IP、URL'
-        : 'URL批量过滤工具';
 }
 
 btnPageFilter.addEventListener('click', () => switchPage('filter'));

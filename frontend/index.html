@@ -34,7 +34,7 @@
             --radius-lg: 12px;
 
             --sidebar-width: 300px;
-            --header-height: 80px;
+            --header-height: 44px;
         }
 
         /* ===== Reset ===== */
@@ -64,7 +64,7 @@
 
         .header {
             height: var(--header-height);
-            padding: var(--space-md) var(--space-lg);
+            padding: var(--space-xs) var(--space-lg);
             background: var(--color-surface);
             border-bottom: 1px solid var(--color-border);
             display: flex;
@@ -119,6 +119,22 @@
         .header-actions {
             display: flex;
             gap: var(--space-sm);
+        }
+
+        .header-actions.hidden {
+            display: none;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
         }
 
         .main {
@@ -440,7 +456,7 @@
         .asset-actions {
             display: flex;
             align-items: center;
-            gap: var(--space-sm);
+            gap: 0;
         }
 
         .asset-actions label {
@@ -473,7 +489,7 @@
         .asset-result-header {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: flex-end;
             padding: var(--space-sm) var(--space-md);
             border-bottom: 1px solid var(--color-border);
             font-size: 13px;
@@ -532,14 +548,13 @@
         <!-- Header -->
         <header class="header">
             <div class="header-top">
-                <h1 class="header-title">URL批量过滤工具</h1>
                 <nav class="page-tabs" aria-label="功能分页">
                     <button class="page-tab active" id="btnPageFilter">URL过滤</button>
                     <button class="page-tab" id="btnPageAssets">资产分拣</button>
                 </nav>
-                <div class="header-status" id="status">准备就绪</div>
+                <span class="sr-only" id="status" aria-live="polite">准备就绪</span>
             </div>
-            <div class="header-actions" id="filterHeaderActions">
+            <div class="header-actions hidden" id="filterHeaderActions">
                 <button class="btn btn-primary" id="btnStart">开始处理</button>
                 <button class="btn btn-secondary" id="btnPause" disabled>暂停</button>
                 <button class="btn btn-secondary" id="btnCancel" disabled>取消</button>
