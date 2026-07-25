@@ -10,6 +10,7 @@ const filterPage = document.getElementById('filterPage');
 const assetPage = document.getElementById('assetPage');
 const btnPageFilter = document.getElementById('btnPageFilter');
 const btnPageAssets = document.getElementById('btnPageAssets');
+const filterHeaderActions = document.getElementById('filterHeaderActions');
 const assetInput = document.getElementById('assetInput');
 const chkFilterPrivate = document.getElementById('chkFilterPrivate');
 const btnExtractAssets = document.getElementById('btnExtractAssets');
@@ -55,6 +56,7 @@ function switchPage(page) {
     assetPage.classList.toggle('hidden', !isAssets);
     btnPageFilter.classList.toggle('active', !isAssets);
     btnPageAssets.classList.toggle('active', isAssets);
+    filterHeaderActions.classList.toggle('hidden', isAssets);
 }
 
 btnPageFilter.addEventListener('click', () => switchPage('filter'));
