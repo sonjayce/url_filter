@@ -118,6 +118,45 @@ func TestExtractAssetsDoesNotTreatURLPathsAsDomains(t *testing.T) {
 	}
 }
 
+func TestExtractAssetsAcceptsEndpointFormats(t *testing.T) {
+	app := &App{}
+	input := `http://ahdx.tv.game.vcache.cn:18081/api/gateway.do
+http://ahdx.tv.game.vcache.cn:18082
+http://117.71.47.141:18081/bgtjdd/static/games/redhat/index.html
+http://117.71.47.102/
+117.71.47.102:18081
+117.71.47.102
+tcp://117.71.47.102
+ahdx.tv.game.vcache.cn
+ahdx.tv.game.vcache.cn:18082
+http://117.71.47.102
+http://ahdx.tv.game.vcache.cn`
+
+	got := app.ExtractAssets(input, false)
+	for _, want := range []string{
+		"http://ahdx.tv.game.vcache.cn:18081/api/gateway.do",
+		"http://ahdx.tv.game.vcache.cn:18082",
+		"http://117.71.47.141:18081/bgtjdd/static/games/redhat/index.html",
+		"http://117.71.47.102/",
+		"tcp://117.71.47.102",
+		"http://117.71.47.102",
+		"http://ahdx.tv.game.vcache.cn",
+	} {
+		if !containsString(got.URLs, want) {
+			t.Errorf("expected URL %q, got %#v", want, got.URLs)
+		}
+	}
+	if !containsString(got.RootDomains, "vcache.cn") {
+		t.Errorf("expected root domain vcache.cn, got %#v", got.RootDomains)
+	}
+	if !containsString(got.Subdomains, "ahdx.tv.game.vcache.cn") {
+		t.Errorf("expected subdomain ahdx.tv.game.vcache.cn, got %#v", got.Subdomains)
+	}
+	if !containsString(got.IPs, "117.71.47.102") || !containsString(got.IPs, "117.71.47.141") {
+		t.Errorf("expected IPv4 assets, got %#v", got.IPs)
+	}
+}
+
 func containsString(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {

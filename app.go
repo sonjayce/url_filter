@@ -942,7 +942,7 @@ func (a *App) ParseExcelFile(base64Data string) ([]string, error) {
 }
 
 var (
-	assetURLPattern        = regexp.MustCompile(`(?i)\bhttps?://[^\s"'<>()[\]]+`)
+	assetURLPattern        = regexp.MustCompile(`(?i)\b[a-z][a-z0-9+.-]*://[^\s"'<>()[\]]+`)
 	assetIPv4Pattern       = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
 	assetDomainPattern     = regexp.MustCompile(`(?i)\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}\b`)
 	assetDomainHostPattern = regexp.MustCompile(`(?i)^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}$`)
@@ -995,7 +995,11 @@ func assetDomainIsInPath(line string, start int) bool {
 func normalizeAssetURL(raw string) (string, *url.URL) {
 	raw = strings.TrimRight(strings.TrimSpace(raw), ".,;:!?)]}>\"'，。；：！？）】")
 	parsed, err := url.Parse(raw)
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" {
+	if err != nil || parsed.Scheme == "" || parsed.Hostname() == "" {
+		return "", nil
+	}
+	host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
+	if net.ParseIP(host) == nil && !assetDomainHostPattern.MatchString(host) {
 		return "", nil
 	}
 	if port := parsed.Port(); port != "" {
@@ -1005,6 +1009,7 @@ func normalizeAssetURL(raw string) (string, *url.URL) {
 		}
 	}
 	parsed.Scheme = strings.ToLower(parsed.Scheme)
+	parsed.Host = strings.Replace(parsed.Host, parsed.Hostname(), host, 1)
 	return parsed.String(), parsed
 }
 

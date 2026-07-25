@@ -100,6 +100,13 @@
             height: 18px;
         }
 
+        .app-icon-letter {
+            font-size: 17px;
+            line-height: 1;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+        }
+
         .page-tabs {
             display: flex;
             gap: var(--space-xs);
@@ -572,10 +579,7 @@
         <header class="header">
             <div class="header-left">
                 <div class="app-icon" aria-hidden="true" title="URL Filter">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 7h16M4 12h10M4 17h16"></path>
-                        <circle cx="17" cy="12" r="2"></circle>
-                    </svg>
+                    <span class="app-icon-letter">W</span>
                 </div>
                 <nav class="page-tabs" aria-label="功能分页">
                     <button class="page-tab active" id="btnPageFilter">URL过滤</button>
