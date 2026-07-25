@@ -676,7 +676,7 @@ func processLines(ctx context.Context, control *processControl, lines []string, 
 				host := getHost(normalized)
 
 				// 状态码检测（提前获取，后续需要用到）
-				if opts.EnableStatus {
+				if opts.EnableStatus && isHTTPURL(normalized) {
 					code = getStatus(ctx, normalized, opts.Timeout)
 					codeStr = statusText(code)
 					hasCode = true
@@ -727,7 +727,7 @@ func processLines(ctx context.Context, control *processControl, lines []string, 
 					continue
 				}
 
-				if opts.EnableStatus && !opts.AllowedCodes[code] {
+				if hasCode && !opts.AllowedCodes[code] {
 					atomic.AddInt64(&ct.StatusBlock, 1)
 					setLog(j.idx-1, fmt.Sprintf("[过滤] [状态码:%s] [%s] %s", codeStr, codeStr, raw))
 					continue
@@ -942,7 +942,7 @@ func (a *App) ParseExcelFile(base64Data string) ([]string, error) {
 }
 
 var (
-	assetURLPattern        = regexp.MustCompile(`(?i)\b[a-z][a-z0-9+.-]*://[^\s"'<>()[\]]+`)
+	assetURLPattern        = regexp.MustCompile(`(?i)\b(?:https?|tcp)://[^\s"'<>()[\]]+`)
 	assetIPv4Pattern       = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
 	assetDomainPattern     = regexp.MustCompile(`(?i)\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}\b`)
 	assetDomainHostPattern = regexp.MustCompile(`(?i)^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}$`)
@@ -995,11 +995,11 @@ func assetDomainIsInPath(line string, start int) bool {
 func normalizeAssetURL(raw string) (string, *url.URL) {
 	raw = strings.TrimRight(strings.TrimSpace(raw), ".,;:!?)]}>\"'，。；：！？）】")
 	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Scheme == "" || parsed.Hostname() == "" {
+	if err != nil || !isSupportedEndpointScheme(parsed.Scheme) || parsed.Hostname() == "" {
 		return "", nil
 	}
 	host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
-	if net.ParseIP(host) == nil && !assetDomainHostPattern.MatchString(host) {
+	if !isValidEndpointHost(host) {
 		return "", nil
 	}
 	if port := parsed.Port(); port != "" {
@@ -1141,10 +1141,13 @@ func normalizeURL(raw string) string {
 	}
 
 	scheme := strings.ToLower(parsed.Scheme)
-	if scheme != "http" && scheme != "https" {
+	if !isSupportedEndpointScheme(scheme) {
 		return ""
 	}
 	if parsed.Host == "" || parsed.Hostname() == "" {
+		return ""
+	}
+	if !isValidEndpointHost(parsed.Hostname()) {
 		return ""
 	}
 	if port := parsed.Port(); port != "" {
@@ -1158,10 +1161,36 @@ func normalizeURL(raw string) string {
 	return parsed.String()
 }
 
+func isSupportedEndpointScheme(scheme string) bool {
+	switch strings.ToLower(scheme) {
+	case "http", "https", "tcp":
+		return true
+	default:
+		return false
+	}
+}
+
+func isHTTPURL(rawURL string) bool {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	return scheme == "http" || scheme == "https"
+}
+
+func isValidEndpointHost(host string) bool {
+	host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), "."))
+	if net.ParseIP(host) != nil {
+		return true
+	}
+	return assetDomainHostPattern.MatchString(host)
+}
+
 // getHost 获取主机名
 func getHost(rawURL string) string {
 	parsed, err := url.Parse(rawURL)
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+	if err != nil || !isSupportedEndpointScheme(parsed.Scheme) {
 		return ""
 	}
 

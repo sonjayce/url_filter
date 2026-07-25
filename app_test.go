@@ -45,10 +45,37 @@ func TestNormalizeURLRejectsInvalidInput(t *testing.T) {
 		"http://example.com:0",
 		"http://example.com:65536",
 		"http://example .com",
+		"http://117.71.47.8089",
 	} {
 		if got := normalizeURL(input); got != "" {
 			t.Errorf("normalizeURL(%q) = %q, want empty", input, got)
 		}
+	}
+}
+
+func TestNormalizeURLAcceptsTCPEndpoint(t *testing.T) {
+	for _, input := range []string{
+		"tcp://117.71.47.102",
+		"tcp://117.71.47.102:18081",
+	} {
+		if got := normalizeURL(input); got != input {
+			t.Errorf("normalizeURL(%q) = %q, want %q", input, got, input)
+		}
+		if got := getHost(input); got != "117.71.47.102" {
+			t.Errorf("getHost(%q) = %q, want 117.71.47.102", input, got)
+		}
+	}
+}
+
+func TestProcessLinesAcceptsTCPEndpoint(t *testing.T) {
+	var counters Counters
+	var logs []string
+	got := runProcessLines([]string{"tcp://117.71.47.102"}, ProcessOptions{
+		EnableDedup: true,
+		RemoveProto: false,
+	}, &counters, &logs)
+	if len(got) != 1 || got[0] != "tcp://117.71.47.102" {
+		t.Fatalf("expected TCP endpoint to be kept, got results=%#v logs=%#v", got, logs)
 	}
 }
 
