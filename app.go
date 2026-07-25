@@ -24,6 +24,7 @@ import (
 	"unicode"
 
 	"github.com/xuri/excelize/v2"
+	"golang.org/x/net/publicsuffix"
 )
 
 // Counters 统计计数器
@@ -959,25 +960,14 @@ func isPrivateAssetIP(raw string) bool {
 
 func assetRootDomain(host string) string {
 	host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), "."))
-	labels := strings.Split(host, ".")
-	if len(labels) < 2 {
+	if host == "" || net.ParseIP(host) != nil || strings.ContainsAny(host, " \t\r\n") {
 		return ""
 	}
-	for _, label := range labels {
-		if label == "" {
-			return ""
-		}
+	root, err := publicsuffix.EffectiveTLDPlusOne(host)
+	if err != nil {
+		return ""
 	}
-
-	twoLevelSuffixes := map[string]bool{
-		"com.cn": true, "net.cn": true, "org.cn": true, "gov.cn": true,
-		"co.uk": true, "org.uk": true, "com.au": true, "co.jp": true,
-	}
-	lastTwo := labels[len(labels)-2] + "." + labels[len(labels)-1]
-	if len(labels) >= 3 && twoLevelSuffixes[lastTwo] {
-		return strings.Join(labels[len(labels)-3:], ".")
-	}
-	return lastTwo
+	return strings.ToLower(strings.TrimSuffix(root, "."))
 }
 
 func normalizeAssetURL(raw string) (string, *url.URL) {

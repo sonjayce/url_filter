@@ -120,6 +120,28 @@ func TestGetHost(t *testing.T) {
 	}
 }
 
+func TestAssetRootDomainUsesPublicSuffixRules(t *testing.T) {
+	tests := map[string]string{
+		"aaa.com":                "aaa.com",
+		"a.bbb.com":              "bbb.com",
+		"api.example.com.cn":     "example.com.cn",
+		"console.example.co.uk":  "example.co.uk",
+		"service.example.com.au": "example.com.au",
+		"a.github.io":            "a.github.io",
+		"EXAMPLE.COM.":           "example.com",
+	}
+	for input, want := range tests {
+		if got := assetRootDomain(input); got != want {
+			t.Errorf("assetRootDomain(%q) = %q, want %q", input, got, want)
+		}
+	}
+	for _, input := range []string{"", "localhost", "127.0.0.1", "bad host"} {
+		if got := assetRootDomain(input); got != "" {
+			t.Errorf("assetRootDomain(%q) = %q, want empty", input, got)
+		}
+	}
+}
+
 func TestNormalizeProcessOptions(t *testing.T) {
 	opts := normalizeProcessOptions(ProcessOptions{
 		Timeout:      -1,
