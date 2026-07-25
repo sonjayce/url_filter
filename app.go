@@ -942,10 +942,11 @@ func (a *App) ParseExcelFile(base64Data string) ([]string, error) {
 }
 
 var (
-	assetURLPattern      = regexp.MustCompile(`(?i)\bhttps?://[^\s"'<>]+`)
-	assetIPv4Pattern     = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
-	assetDomainPattern   = regexp.MustCompile(`(?i)\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\b`)
-	assetHostPortPattern = regexp.MustCompile(`(?i)\b(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|(?:\d{1,3}\.){3}\d{1,3}):\d{1,5}\b`)
+	assetURLPattern        = regexp.MustCompile(`(?i)\bhttps?://[^\s"'<>()[\]]+`)
+	assetIPv4Pattern       = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b`)
+	assetDomainPattern     = regexp.MustCompile(`(?i)\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}\b`)
+	assetDomainHostPattern = regexp.MustCompile(`(?i)^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}$`)
+	assetHostPortPattern   = regexp.MustCompile(`(?i)\b(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|(?:\d{1,3}\.){3}\d{1,3}):\d{1,5}\b`)
 )
 
 const defaultTscanPlusResultPath = `D:\ns-tools\TscanPlus\TscanPlus-Result.txt`
@@ -960,7 +961,7 @@ func isPrivateAssetIP(raw string) bool {
 
 func assetRootDomain(host string) string {
 	host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(host), "."))
-	if host == "" || net.ParseIP(host) != nil || strings.ContainsAny(host, " \t\r\n") {
+	if host == "" || net.ParseIP(host) != nil || !assetDomainHostPattern.MatchString(host) {
 		return ""
 	}
 	root, err := publicsuffix.EffectiveTLDPlusOne(host)
@@ -968,6 +969,18 @@ func assetRootDomain(host string) string {
 		return ""
 	}
 	return strings.ToLower(strings.TrimSuffix(root, "."))
+}
+
+func assetDomainIsInPath(line string, start int) bool {
+	if start == 0 {
+		return false
+	}
+	switch line[start-1] {
+	case '/', '?', '&', '=', '#':
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizeAssetURL(raw string) (string, *url.URL) {
@@ -1029,7 +1042,16 @@ func (a *App) ExtractAssets(input string, filterPrivate bool) AssetExtractionRes
 	}
 
 	for _, line := range strings.Split(input, "\n") {
-		for _, rawURL := range assetURLPattern.FindAllString(line, -1) {
+		urlMatches := assetURLPattern.FindAllStringIndex(line, -1)
+		maskedLine := []byte(line)
+		for _, match := range urlMatches {
+			for i := match[0]; i < match[1]; i++ {
+				maskedLine[i] = ' '
+			}
+		}
+
+		for _, match := range urlMatches {
+			rawURL := line[match[0]:match[1]]
 			normalized, parsed := normalizeAssetURL(rawURL)
 			if normalized == "" {
 				continue
@@ -1052,15 +1074,19 @@ func (a *App) ExtractAssets(input string, filterPrivate bool) AssetExtractionRes
 			}
 		}
 
-		for _, rawIP := range assetIPv4Pattern.FindAllString(line, -1) {
+		for _, rawIP := range assetIPv4Pattern.FindAllString(string(maskedLine), -1) {
 			addIP(rawIP)
 		}
-		for _, rawDomain := range assetDomainPattern.FindAllString(line, -1) {
+		for _, match := range assetDomainPattern.FindAllStringIndex(string(maskedLine), -1) {
+			if assetDomainIsInPath(line, match[0]) {
+				continue
+			}
+			rawDomain := string(maskedLine[match[0]:match[1]])
 			if domain := assetRootDomain(rawDomain); domain != "" {
 				add("domain", domain)
 			}
 		}
-		for _, hostPort := range assetHostPortPattern.FindAllString(line, -1) {
+		for _, hostPort := range assetHostPortPattern.FindAllString(string(maskedLine), -1) {
 			parts := strings.Split(hostPort, ":")
 			port, err := strconv.Atoi(parts[len(parts)-1])
 			if err == nil && port >= 1 && port <= 65535 {

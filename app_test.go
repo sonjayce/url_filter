@@ -97,6 +97,27 @@ http://invalid.example.com:99999`
 	}
 }
 
+func TestExtractAssetsDoesNotTreatURLPathsAsDomains(t *testing.T) {
+	app := &App{}
+	input := `电信电视团队	[http://ahdx.tv.game.vcache.cn:18081/api/gateway.do](http://ahdx.tv.game.vcache.cn:18081/api/gateway.do)
+电信电视团队	[http://ahdx.tv.game.vcache.cn:18082/web/epg/epg.html](http://117.71.47.101:18082/web/epg/epg.html)
+电信电视团队	http://117.71.47.141:18081/bgtjdd/static/games/redhat/index.html
+电信电视团队	http://117.71.47.8089/zabbix`
+
+	got := app.ExtractAssets(input, false)
+	if !containsString(got.RootDomains, "vcache.cn") {
+		t.Fatalf("expected vcache.cn, got %#v", got.RootDomains)
+	}
+	for _, unwanted := range []string{"gateway.do", "epg.html", "index.html", "47.8089"} {
+		if containsString(got.RootDomains, unwanted) {
+			t.Fatalf("path or malformed IP %q was extracted as root domain: %#v", unwanted, got.RootDomains)
+		}
+	}
+	if containsString(got.URLs, "http://ahdx.tv.game.vcache.cn:18081/api/gateway.do](http://ahdx.tv.game.vcache.cn:18081/api/gateway.do)") {
+		t.Fatalf("markdown delimiters were included in URL result: %#v", got.URLs)
+	}
+}
+
 func containsString(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {
